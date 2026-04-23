@@ -1,0 +1,24 @@
+{
+  "name": "vibe-coding-xr-stanisanjaya",
+  "version": "1.0.0",
+  "description": "XR Blocks Echocardiogram Simulation",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx live-server --port=8080",
+    "dev": "npx live-server --port=8080 --open",
+    "build": "echo 'No build step required for static site'",
+    "deploy": "gh-pages -d ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/vibe-coding-xr-stanisanjaya.git"
+  },
+  "keywords": ["xr", "webxr", "three.js", "echocardiogram"],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2",
+    "gh-pages": "^6.1.1"
+  },
+  "homepage": "https://yourusername.github.io/vibe-coding-xr-stanisanjaya"
+}
