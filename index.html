@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Echocardiogram (Echo) Simulation | XR Blocks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <link type="text/css" rel="stylesheet" href="https://xrblocks.github.io/css/xr.css" />
+    <script>
+      window.litDisableBundleWarning = true;
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/",
+          "troika-three-text": "https://cdn.jsdelivr.net/gh/protectwise/troika@028b81cf308f0f22e5aa8e78196be56ec1997af5/packages/troika-three-text/src/index.js",
+          "troika-three-utils": "https://cdn.jsdelivr.net/gh/protectwise/troika@v0.52.4/packages/troika-three-utils/src/index.js",
+          "troika-worker-utils": "https://cdn.jsdelivr.net/gh/protectwise/troika@v0.52.4/packages/troika-worker-utils/src/index.js",
+          "bidi-js": "https://esm.sh/bidi-js@%5E1.0.2?target=es2022",
+          "webgl-sdf-generator": "https://esm.sh/webgl-sdf-generator@1.1.1/es2022/webgl-sdf-generator.mjs",
+          "lit": "https://cdn.jsdelivr.net/gh/lit/dist@3/core/lit-core.min.js",
+          "lit/": "https://esm.run/lit@3/",
+          "xrblocks": "https://cdn.jsdelivr.net/npm/xrblocks@0.11.0/build/xrblocks.js",
+          "xrblocks/addons/": "https://cdn.jsdelivr.net/npm/xrblocks@0.11.0/build/addons/",
+          "@google/genai": "https://cdn.jsdelivr.net/npm/@google/genai/+esm"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import * as THREE from 'three';
+      import * as xb from 'xrblocks';
+
+      /**
+       * Immersive 3D medical simulation for an Echocardiogram (Echo) procedure.
+       */
+      class EchoSimulator extends xb.Script {
+        constructor() {
+          super();
+          this.isGrabbing = false;
+          this.grabbedProbe = null;
+          this._handToObject = null;
+
+          // Diagnostics State
+          this.currentState = 'idle'; // idle, apical, parasternal, doppler
+
+          // AI State
+          this.isProcessing = false;
+        }
+
+        init() {
+          // 1. Clinical Lighting Setup
+          this.add(new THREE.HemisphereLight(0xffffff, 0xbbeeff, 1.5));
+          const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+          dirLight.position.set(0, 3, 2);
+          this.add(dirLight);
+
+          // 2. Patient Anatomy (Torso & Heart)
+          this.createPatient();
+
+          // 3. Ultrasound Probe
+          this.createProbe();
+
+          // 4. Clinical Monitor Screen
+          this.createMonitor();
+
+          // Diagnostic Target Zones
+          this.apicalTarget = new THREE.Vector3(0.05, 1.35, -0.45); // Lower left of heart
+          this.parasternalTarget = new THREE.Vector3(-0.02, 1.45, -0.42); // Upper middle
+        }
+
+        createPatient() {
+          this.patientGroup = new THREE.Group();
+          this.patientGroup.position.set(0, 0, -0.6); // Placed in front of user
+
+          // Semi-transparent Torso
+          const torsoGeo = new THREE.CapsuleGeometry(0.25, 0.35, 16, 32);
+          const torsoMat = new THREE.MeshPhysicalMaterial({
+            color: 0xe0d5c1,
+            transparent: true,
+            opacity: 0.25,
+            roughness: 0.2,
+            transmission: 0.8,
+            thickness: 0.1
+          });
+          const torso = new THREE.Mesh(torsoGeo, torsoMat);
+          torso.position.set(0, 1.4, 0);
+          this.patientGroup.add(torso);
+
+          // Animated Heart Group
+          this.heartGroup = new THREE.Group();
+          this.heartGroup.position.set(-0.02, 1.42, -0.1); // Inside torso, slightly left
+          
+          // Left Ventricle (LV) - Main body
+          this.lvMaterial = new THREE.MeshStandardMaterial({ color: 0x992233, roughness: 0.3 });
+          this.lvMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 32, 32), this.lvMaterial);
+          this.lvMesh.scale.set(1, 1.2, 1);
+          this.lvMesh.position.set(0.03, -0.03, 0.02);
+          this.heartGroup.add(this.lvMesh);
+
+          // Right Ventricle (RV)
+          this.rvMaterial = new THREE.MeshStandardMaterial({ color: 0x772233, roughness: 0.4 });
+          this.rvMesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 32), this.rvMaterial);
+          this.rvMesh.position.set(-0.04, -0.02, 0.04);
+          this.heartGroup.add(this.rvMesh);
+
+          // Mitral Valve (Visual representation)
+          this.valveMaterial = new THREE.MeshStandardMaterial({ color: 0xdddddd, emissive: 0x222222 });
+          this.valveMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.01, 16), this.valveMaterial);
+          this.valveMesh.rotation.x = Math.PI / 4;
+          this.valveMesh.position.set(0.01, 0.03, 0.01);
+          this.heartGroup.add(this.valveMesh);
+
+          this.patientGroup.add(this.heartGroup);
+          this.add(this.patientGroup);
+        }
+
+        createProbe() {
+          // Handheld Ultrasound Transducer
+          this.probeGroup = new THREE.Group();
+          // Initial position floating near the patient, ready to be grabbed
+          this.probeGroup.position.set(0.4, 1.3, -0.4); 
+
+          // Probe Handle
+          const handleGeo = new THREE.BoxGeometry(0.03, 0.12, 0.04);
+          const handleMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 });
+          this.probeMesh = new THREE.Mesh(handleGeo, handleMat);
+          this.probeMesh.userData.isProbe = true;
+          
+          // Probe Head
+          const headGeo = new THREE.BoxGeometry(0.035, 0.02, 0.06);
+          const headMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
+          const headMesh = new THREE.Mesh(headGeo, headMat);
+          headMesh.position.set(0, -0.06, 0);
+          
+          this.probeMesh.add(headMesh);
+          this.probeGroup.add(this.probeMesh);
+
+          // Simulated Ultrasound Beam (Invisible by default)
+          const beamGeo = new THREE.ConeGeometry(0.15, 0.3, 16);
+          const beamMat = new THREE.MeshBasicMaterial({ 
+            color: 0x00ffff, 
+            transparent: true, 
+            opacity: 0.15,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          });
+          this.beamMesh = new THREE.Mesh(beamGeo, beamMat);
+          this.beamMesh.position.set(0, -0.21, 0); // Positioned below the head
+          this.beamMesh.visible = false;
+          this.probeMesh.add(this.beamMesh);
+
+          this.add(this.probeGroup);
+        }
+
+        createMonitor() {
+          this.monitorPanel = new xb.SpatialPanel({
+            width: 0.9,
+            height: 1.1, // Increased height for AI Assistant section
+            backgroundColor: '#0a0f1acc' // Clinical dark blue/black
+          });
+          this.monitorPanel.position.set(-0.8, 1.6, -0.7);
+          this.monitorPanel.rotation.y = Math.PI / 6; // Angled towards user
+          this.add(this.monitorPanel);
+
+          const grid = this.monitorPanel.addGrid();
+
+          // Header
+          grid.addRow({weight: 0.1}).addText({
+            text: 'CARDIAC ULTRASOUND SYSTEM',
+            fontSize: 0.04,
+            fontColor: '#44aaff'
+          });
+
+          // Imaging Area (Mock 2D Screen)
+          const screenRow = grid.addRow({weight: 0.45});
+          this.screenBg = screenRow.addPanel({ backgroundColor: '#000000', showEdge: true });
+          this.echoVisualText = this.screenBg.addGrid().addRow().addText({
+            text: '[ SYSTEM STANDBY ]\n\nPlease apply probe to patient chest.',
+            fontSize: 0.05,
+            fontColor: '#555555'
+          });
+
+          // Diagnostics / Telemetry Area
+          const diagRow = grid.addRow({weight: 0.2});
+          this.diagPanel = diagRow.addPanel({ backgroundColor: '#112233aa' });
+          const diagGrid = this.diagPanel.addGrid();
+          this.diagTitle = diagGrid.addRow({weight: 0.4}).addText({
+            text: 'Diagnostics: Not Active',
+            fontSize: 0.045,
+            fontColor: '#aaaaaa'
+          });
+          this.diagDetails = diagGrid.addRow({weight: 0.6}).addText({
+            text: '---',
+            fontSize: 0.05,
+            fontColor: '#ffffff'
+          });
+
+          // AI Assistant Area
+          const aiRow = grid.addRow({weight: 0.25});
+          this.aiPanel = aiRow.addPanel({ backgroundColor: '#1a1a2eaa' });
+          const aiGrid = this.aiPanel.addGrid();
+          
+          this.aiDisplay = new xb.ScrollingTroikaTextView({
+            text: '✨ AI Assistant Ready. Position the probe and select an action.',
+            fontSize: 0.035,
+            fontColor: '#b0c4de'
+          });
+          aiGrid.addRow({weight: 0.7}).add(this.aiDisplay);
+
+          const btnRow = aiGrid.addRow({weight: 0.3});
+          const explainBtn = btnRow.addCol({weight: 0.5}).addTextButton({
+            text: '✨ Explain Findings',
+            fontSize: 0.035,
+            backgroundColor: '#2b5b84',
+            fontColor: '#ffffff'
+          });
+          explainBtn.onTriggered = () => this.explainFindings();
+
+          const reportBtn = btnRow.addCol({weight: 0.5}).addTextButton({
+            text: '✨ Draft Report',
+            fontSize: 0.035,
+            backgroundColor: '#2b845b',
+            fontColor: '#ffffff'
+          });
+          reportBtn.onTriggered = () => this.draftReport();
+        }
+
+        async explainFindings() {
+          if (this.isProcessing || !xb.core.ai?.isAvailable()) return;
+          this.isProcessing = true;
+          this.aiDisplay.setText('✨ Analyzing findings...');
+          
+          const finding = this.diagDetails.text;
+          const focus = this.diagTitle.text;
+
+          const prompt = `You are an expert cardiologist AI assistant. Explain the following echocardiogram observation to a medical student simply but accurately. Focus area: ${focus}. Finding: ${finding}. Keep the response strictly under 3 sentences.`;
+
+          try {
+            const response = await xb.core.ai.query({
+              type: 'multiPart',
+              parts: [{text: prompt}]
+            });
+            this.aiDisplay.setText(`🤖 AI: ${response.text}\n\n`);
+          } catch (error) {
+            this.aiDisplay.setText(`❌ Error: ${error.message}\n\n`);
+          }
+          this.isProcessing = false;
+        }
+
+        async draftReport() {
+          if (this.isProcessing || !xb.core.ai?.isAvailable()) return;
+          this.isProcessing = true;
+          this.aiDisplay.setText('✨ Drafting clinical report...');
+          
+          const finding = this.diagDetails.text;
+          const focus = this.diagTitle.text;
+
+          const prompt = `Write a professional echocardiogram clinical report summary based on this observation. Area: ${focus}. Observation: ${finding}. Keep it concise, strictly under 40 words, and use standard medical terminology.`;
+
+          try {
+            const response = await xb.core.ai.query({
+              type: 'multiPart',
+              parts: [{text: prompt}]
+            });
+            this.aiDisplay.setText(`📝 Report: ${response.text}\n\n`);
+          } catch (error) {
+            this.aiDisplay.setText(`❌ Error: ${error.message}\n\n`);
+          }
+          this.isProcessing = false;
+        }
+
+        // --- Interaction: Grabbing the Probe ---
+        
+        onObjectGrabStart(event) {
+          if (this.isGrabbing) return;
+          const target = event.object;
+          
+          if (target && target.userData.isProbe) {
+            this.isGrabbing = true;
+            this.grabbedProbe = target;
+
+            this.probeGroup.updateMatrixWorld(true);
+            event.hand.updateMatrixWorld(true);
+
+            const H0inv = new THREE.Matrix4().copy(event.hand.matrixWorld).invert();
+            const O0 = new THREE.Matrix4().copy(this.probeGroup.matrixWorld);
+            this._handToObject = new THREE.Matrix4().multiplyMatrices(H0inv, O0);
+          }
+        }
+
+        onObjectGrabbing(event) {
+          if (!this.isGrabbing || !this._handToObject || !this.grabbedProbe) return;
+
+          event.hand.updateMatrixWorld(true);
+          const H = new THREE.Matrix4().copy(event.hand.matrixWorld);
+          const O = new THREE.Matrix4().multiplyMatrices(H, this._handToObject);
+          
+          const pos = new THREE.Vector3();
+          const quat = new THREE.Quaternion();
+          const scl = new THREE.Vector3();
+          O.decompose(pos, quat, scl);
+
+          this.probeGroup.position.copy(pos);
+          this.probeGroup.quaternion.copy(quat);
+        }
+
+        onObjectGrabEnd(event) {
+          this.isGrabbing = false;
+          this.grabbedProbe = null;
+          this._handToObject = null;
+          this.beamMesh.visible = false;
+          this.setMonitorState('idle');
+        }
+
+        // --- Core Update Loop (Animation & Logic) ---
+
+        update() {
+          const now = performance.now();
+          
+          // 1. Animate Heartbeat (Realistic Lub-Dub pattern)
+          // Cycle duration ~ 1000ms (60 BPM)
+          const t = (now % 1000) / 1000;
+          let scale = 1.0;
+          if (t < 0.2) {
+            // Systole (contraction)
+            scale = 1.0 - Math.sin(t * Math.PI * 5) * 0.08;
+          } else if (t > 0.3 && t < 0.5) {
+            // Diastole subtle secondary beat
+            scale = 1.0 - Math.sin((t - 0.3) * Math.PI * 5) * 0.03;
+          }
+          this.heartGroup.scale.set(scale, scale, scale);
+
+          // 2. Probe Collision & Diagnostics Mapping
+          if (this.isGrabbing) {
+            const probePos = new THREE.Vector3();
+            this.probeMesh.getWorldPosition(probePos);
+
+            // Calculate distances to cardiac windows
+            const distApical = probePos.distanceTo(this.apicalTarget);
+            const distParasternal = probePos.distanceTo(this.parasternalTarget);
+
+            // Thresholds
+            const hoverDist = 0.15;
+            const pressDist = 0.06; // Pressing hard activates Color Doppler
+
+            let newState = 'idle';
+
+            if (distApical < hoverDist) {
+              newState = distApical < pressDist ? 'apical_doppler' : 'apical';
+            } else if (distParasternal < hoverDist) {
+              newState = distParasternal < pressDist ? 'parasternal_doppler' : 'parasternal';
+            } else if (distApical < 0.3 || distParasternal < 0.3) {
+              newState = 'searching';
+            }
+
+            this.setMonitorState(newState);
+            
+            // Show beam when close to chest
+            this.beamMesh.visible = (newState !== 'idle' && newState !== 'searching');
+          }
+        }
+
+        setMonitorState(state) {
+          if (this.currentState === state) return;
+          this.currentState = state;
+
+          // Reset Highlights
+          this.lvMesh.material.emissive.setHex(0x000000);
+          this.valveMesh.material.emissive.setHex(0x222222);
+          this.lvMaterial.color.setHex(0x992233);
+          this.rvMaterial.color.setHex(0x772233);
+          this.beamMesh.material.color.setHex(0x00ffff);
+
+          switch (state) {
+            case 'idle':
+              this.echoVisualText.setText('[ SYSTEM STANDBY ]\n\nPlease apply probe to patient chest.');
+              this.echoVisualText.setFontColor('#555555');
+              this.diagTitle.setText('Diagnostics: Not Active');
+              this.diagDetails.setText('---');
+              break;
+
+            case 'searching':
+              this.echoVisualText.setText('~ Poor Acoustic Window ~\nAdjust position...');
+              this.echoVisualText.setFontColor('#aaaa00');
+              this.diagTitle.setText('Diagnostics: Searching');
+              this.diagDetails.setText('Signal too weak');
+              break;
+
+            case 'apical':
+              this.echoVisualText.setText('//// APICAL 4-CHAMBER VIEW ////\n\n(Simulated 2D Echo active)');
+              this.echoVisualText.setFontColor('#dddddd');
+              this.diagTitle.setText('Focus: Left Ventricle');
+              this.diagDetails.setText('Ejection Fraction: Normal (60%)');
+              this.diagDetails.setFontColor('#00ff44');
+              this.lvMesh.material.emissive.setHex(0x441111); // Highlight LV
+              break;
+
+            case 'apical_doppler':
+              this.echoVisualText.setText('[[ COLOR DOPPLER ACTIVE ]]\n\nApical 4-Chamber Flow');
+              this.echoVisualText.setFontColor('#ff4444');
+              this.diagTitle.setText('Focus: Ventricular Blood Flow');
+              this.diagDetails.setText('Velocity: Normal | Direction: Stable');
+              this.diagDetails.setFontColor('#ffaa00');
+              // Doppler Visuals: Red (towards), Blue (away)
+              this.lvMaterial.color.setHex(0xff1111);
+              this.rvMaterial.color.setHex(0x1144ff);
+              this.beamMesh.material.color.setHex(0xffaa44);
+              break;
+
+            case 'parasternal':
+              this.echoVisualText.setText('//// PARASTERNAL LONG AXIS ////\n\n(Simulated 2D Echo active)');
+              this.echoVisualText.setFontColor('#dddddd');
+              this.diagTitle.setText('Focus: Mitral Valve');
+              this.diagDetails.setText('Status: Normal Flow / No Regurgitation');
+              this.diagDetails.setFontColor('#00ff44');
+              this.valveMesh.material.emissive.setHex(0x666666); // Highlight Valve
+              break;
+
+            case 'parasternal_doppler':
+              this.echoVisualText.setText('[[ COLOR DOPPLER ACTIVE ]]\n\nParasternal Long Axis Flow');
+              this.echoVisualText.setFontColor('#ff4444');
+              this.diagTitle.setText('Focus: Valvular Hemodynamics');
+              this.diagDetails.setText('Trace Mitral Regurgitation (Benign)');
+              this.diagDetails.setFontColor('#ffaa00');
+              // Doppler Visuals
+              this.lvMaterial.color.setHex(0xff1111);
+              this.valveMesh.material.emissive.setHex(0xffaa44);
+              this.beamMesh.material.color.setHex(0xffaa44);
+              break;
+          }
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const options = new xb.Options();
+        options.enableUI();
+        options.enableHands();
+        options.enableAI(); // Enabled Gemini AI capabilities
+        
+        // Ensure joints/meshes are visible so the user knows where their hands are
+        options.hands.visualization = true;
+        options.hands.visualizeJoints = true;
+        
+        xb.add(new EchoSimulator());
+        xb.init(options);
+      });
+    </script>
+  </body>
+</html>
