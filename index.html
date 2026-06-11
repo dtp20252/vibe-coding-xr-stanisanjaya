@@ -1,450 +1,724 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <title>Echocardiogram (Echo) Simulation | XR Blocks</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <link type="text/css" rel="stylesheet" href="https://xrblocks.github.io/css/xr.css" />
-    <script>
-      window.litDisableBundleWarning = true;
-    </script>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/",
-          "troika-three-text": "https://cdn.jsdelivr.net/gh/protectwise/troika@028b81cf308f0f22e5aa8e78196be56ec1997af5/packages/troika-three-text/src/index.js",
-          "troika-three-utils": "https://cdn.jsdelivr.net/gh/protectwise/troika@v0.52.4/packages/troika-three-utils/src/index.js",
-          "troika-worker-utils": "https://cdn.jsdelivr.net/gh/protectwise/troika@v0.52.4/packages/troika-worker-utils/src/index.js",
-          "bidi-js": "https://esm.sh/bidi-js@%5E1.0.2?target=es2022",
-          "webgl-sdf-generator": "https://esm.sh/webgl-sdf-generator@1.1.1/es2022/webgl-sdf-generator.mjs",
-          "lit": "https://cdn.jsdelivr.net/gh/lit/dist@3/core/lit-core.min.js",
-          "lit/": "https://esm.run/lit@3/",
-          "xrblocks": "https://cdn.jsdelivr.net/npm/xrblocks@0.11.0/build/xrblocks.js",
-          "xrblocks/addons/": "https://cdn.jsdelivr.net/npm/xrblocks@0.11.0/build/addons/",
-          "@google/genai": "https://cdn.jsdelivr.net/npm/@google/genai/+esm"
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Simulasi Ekokardiogram TTE - VR Training</title>
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+
+    /* ══ Loading Screen ══ */
+    #loading-screen {
+      position: fixed; inset: 0;
+      background: #0a0f1e;
+      color: #00ff88;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 99999;
+      font-family: Arial, sans-serif;
+    }
+    #loading-screen h2 { margin-bottom: 10px; font-size: 22px; }
+    #loading-screen p  { color: #7a9cbb; font-size: 14px; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #1e3a5f;
+      border-top-color: #00ff88;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ══ Kiri: Pilih View ══ */
+    #ui-panel {
+      position: fixed; top: 20px; left: 20px;
+      z-index: 9999;
+      background: rgba(5, 15, 35, 0.92);
+      border: 1px solid #1e3a5f;
+      padding: 16px; border-radius: 12px;
+      color: white; font-family: Arial, sans-serif;
+      width: 210px; display: none;
+    }
+    #ui-panel h3 { margin: 0 0 12px; color: #00ff88; font-size: 14px; letter-spacing: 1px; }
+    .view-btn {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: 10px 12px; margin: 5px 0;
+      background: #0d1b2a; color: #cdd9e5;
+      border: 1px solid #1e3a5f; border-radius: 7px;
+      cursor: pointer; font-size: 13px; transition: all 0.2s;
+      text-align: left;
+    }
+    .view-btn .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .view-btn:hover  { border-color: #00ff88; color: #fff; }
+    .view-btn.active { border-color: #00ff88; background: #0d2b1e; color: #00ff88; }
+
+    /* ══ Kanan: Info Klinis ══ */
+    #clinical-panel {
+      position: fixed; top: 20px; right: 20px;
+      z-index: 9999;
+      background: rgba(5, 15, 35, 0.93);
+      border: 1px solid #1e3a5f;
+      padding: 16px; border-radius: 12px;
+      color: white; font-family: Arial, sans-serif;
+      width: 300px; display: none;
+    }
+    #clinical-panel h3 {
+      margin: 0 0 4px; font-size: 15px; color: #00ff88;
+    }
+    #clinical-subtitle { font-size: 11px; color: #7a9cbb; margin-bottom: 12px; }
+    .info-row {
+      display: flex; gap: 8px; margin-bottom: 8px;
+      font-size: 12px; line-height: 1.4;
+    }
+    .info-label {
+      color: #00aaff; font-weight: bold;
+      min-width: 90px; flex-shrink: 0;
+    }
+    .info-value { color: #d0e0f0; }
+    .struct-list {
+      margin: 8px 0 0; padding: 8px;
+      background: #0d1b2a; border-radius: 6px;
+      border-left: 3px solid #00ff88;
+      font-size: 12px; line-height: 1.6; color: #aaccee;
+    }
+    .struct-list strong { color: #fff; display: block; margin-bottom: 4px; }
+    .tip-box {
+      margin-top: 10px; padding: 8px;
+      background: #1a1000; border-radius: 6px;
+      border-left: 3px solid #ffaa00;
+      font-size: 11px; color: #ffcc66; line-height: 1.5;
+    }
+    .tip-box strong { color: #ffaa00; }
+
+    /* ══ Bawah: Sonogram 2D ══ */
+    #sonogram-panel {
+      position: fixed; bottom: 20px; right: 20px;
+      z-index: 9999;
+      background: rgba(5, 15, 35, 0.93);
+      border: 1px solid #1e3a5f;
+      padding: 12px; border-radius: 12px;
+      color: white; font-family: Arial, sans-serif;
+      display: none;
+    }
+    #sonogram-panel h4 {
+      margin: 0 0 8px; font-size: 12px;
+      color: #7a9cbb; text-align: center; letter-spacing: 1px;
+    }
+    #sonogram-canvas {
+      display: block; border-radius: 8px;
+      background: #000;
+    }
+
+    /* ══ Probe proximity badge ══ */
+    #proximity-badge {
+      position: fixed; bottom: 20px; left: 20px;
+      z-index: 9999;
+      background: rgba(0,180,80,0.15);
+      border: 2px solid #00ff88;
+      padding: 10px 16px; border-radius: 8px;
+      color: #00ff88; font-family: Arial, sans-serif;
+      font-size: 13px; display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <h2>🫀 Simulasi Ekokardiogram TTE</h2>
+  <p>Memuat model 3D — harap tunggu...</p>
+</div>
+
+<!-- Pilih View (kiri) -->
+<div id="ui-panel">
+  <h3>📡 PILIH VIEW TTE</h3>
+  <button class="view-btn active" id="btn-plax"      onclick="selectView('plax')">
+    <span class="dot" style="background:#ff6b6b"></span> Parasternal Long Axis
+  </button>
+  <button class="view-btn" id="btn-psax"      onclick="selectView('psax')">
+    <span class="dot" style="background:#ffd93d"></span> Parasternal Short Axis
+  </button>
+  <button class="view-btn" id="btn-apical4"   onclick="selectView('apical4')">
+    <span class="dot" style="background:#6bcb77"></span> Apical 4-Chamber
+  </button>
+  <button class="view-btn" id="btn-subcostal" onclick="selectView('subcostal')">
+    <span class="dot" style="background:#4d96ff"></span> Subcostal (Subxiphoid)
+  </button>
+</div>
+
+<!-- Info Klinis (kanan) -->
+<div id="clinical-panel">
+  <h3 id="cp-title">Parasternal Long Axis (PLAX)</h3>
+  <div id="clinical-subtitle">View Standar TTE #1</div>
+  <div class="info-row">
+    <span class="info-label">📍 Posisi:</span>
+    <span class="info-value" id="cp-position">Left sternal border, ICS 3–4</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">🔄 Marker:</span>
+    <span class="info-value" id="cp-marker">Arah bahu kanan pasien (jam 10–11)</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">📐 Sudut:</span>
+    <span class="info-value" id="cp-angle">Hampir tegak lurus dinding dada</span>
+  </div>
+  <div class="struct-list">
+    <strong>🫀 Struktur yang Terlihat:</strong>
+    <span id="cp-structures">RV (anterior) · IVS · LV · Katup Mitral · LA · Aortic Root · Katup Aorta · Posterior Wall</span>
+  </div>
+  <div class="tip-box">
+    <strong>💡 Tips:</strong>
+    <span id="cp-tip">Aortic root harus tampak horizontal. Jika miring, rotasi probe sedikit searah jarum jam.</span>
+  </div>
+</div>
+
+<!-- Sonogram 2D (kanan bawah) -->
+<div id="sonogram-panel">
+  <h4>SIMULASI TAMPILAN USG</h4>
+  <canvas id="sonogram-canvas" width="260" height="200"></canvas>
+</div>
+
+<!-- Proximity badge -->
+<div id="proximity-badge" id="proximity-badge">
+  ✅ <span id="proximity-text">Probe di zona PLAX</span>
+</div>
+
+<!-- ════════════════════════════════
+     A-FRAME SCENE
+════════════════════════════════ -->
+<a-scene xr-mode-ui="enabled: true">
+
+  <a-assets timeout="30000">
+    <a-asset-item id="room-model"    src="assets/operating-room-equiptment-model.glb"></a-asset-item>
+    <a-asset-item id="patient-model" src="assets/patient.glb"></a-asset-item>
+    <a-asset-item id="cardiac-model" src="assets/cardiac-interactive.glb"></a-asset-item>
+    <a-asset-item id="probe-model"   src="assets/sonoque-c3-ultrasound-probe.glb"></a-asset-item>
+  </a-assets>
+
+  <!-- Background -->
+  <a-sky color="#0a0f1e"></a-sky>
+
+  <!-- Pencahayaan -->
+  <a-light type="ambient"     color="#ffffff" intensity="1.5"></a-light>
+  <a-light type="directional" color="#ffffff" intensity="1.0" position="-2 6 4"></a-light>
+  <a-light type="point"       color="#aaddff" intensity="0.7" position="0 3.5 -1"></a-light>
+  <a-light type="point"       color="#ffffff" intensity="0.4" position="2 2 2"></a-light>
+
+  <!-- Ruang Operasi -->
+  <a-entity gltf-model="#room-model" position="0 0 0" scale="1 1 1"></a-entity>
+
+  <!-- ── Pasien + Target Probe Anatomi ── -->
+  <a-entity id="patient-environment" position="-0.3 1.0 -0.8">
+
+    <a-entity gltf-model="#patient-model" rotation="0 90 0" scale="0.01 0.01 0.01"></a-entity>
+
+    <!-- TARGET 1: PLAX / PSAX — Left Sternal Border ICS 3-4
+         Geser ke arah kepala (z negatif), dada atas -->
+    <a-circle id="target-parasternal"
+              color="#ff6b6b" radius="0.05"
+              rotation="-90 0 0" position="0.05 0.16 -0.42"
+              opacity="0.55">
+      <a-animation attribute="opacity" from="0.35" to="0.85"
+                   dur="900" direction="alternate" repeat="indefinite"></a-animation>
+      <a-text value="PLAX / PSAX" align="center"
+              position="0 0 0.01" scale="0.09 0.09 0.09" color="#ffdddd"></a-text>
+      <!-- Panah ke bawah di atas titik ini (muncul saat aktif) -->
+      <a-entity id="arrow-parasternal" position="0 0.18 0" visible="false" rotation="0 0 0">
+        <a-cylinder color="#ff6b6b" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
+        <a-cone color="#ff6b6b" radius-bottom="0.022" radius-top="0"
+                height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
+      </a-entity>
+    </a-circle>
+
+    <!-- TARGET 2: Apical 4C — ICS 5, mid-clavicular kiri
+         Lebih ke kiri (+X), sedikit lebih ke kaki dari PLAX -->
+    <a-circle id="target-apical"
+              color="#6bcb77" radius="0.05"
+              rotation="-90 0 0" position="0.18 0.16 -0.33"
+              opacity="0.55">
+      <a-animation attribute="opacity" from="0.35" to="0.85"
+                   dur="1000" direction="alternate" repeat="indefinite"></a-animation>
+      <a-text value="Apical 4C" align="center"
+              position="0 0 0.01" scale="0.09 0.09 0.09" color="#ccffcc"></a-text>
+      <!-- Panah ke bawah di atas titik ini -->
+      <a-entity id="arrow-apical" position="0 0.18 0" visible="false">
+        <a-cylinder color="#6bcb77" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
+        <a-cone color="#6bcb77" radius-bottom="0.022" radius-top="0"
+                height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
+      </a-entity>
+    </a-circle>
+
+    <!-- TARGET 3: Subcostal — Subxiphoid
+         Tengah X, di bawah xiphoid (antara sternum dan pusar) -->
+    <a-circle id="target-subcostal"
+              color="#4d96ff" radius="0.05"
+              rotation="-90 0 0" position="0.0 0.16 -0.22"
+              opacity="0.55">
+      <a-animation attribute="opacity" from="0.35" to="0.85"
+                   dur="1100" direction="alternate" repeat="indefinite"></a-animation>
+      <a-text value="Subcostal" align="center"
+              position="0 0 0.01" scale="0.09 0.09 0.09" color="#cce0ff"></a-text>
+      <!-- Panah ke bawah di atas titik ini -->
+      <a-entity id="arrow-subcostal" position="0 0.18 0" visible="false">
+        <a-cylinder color="#4d96ff" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
+        <a-cone color="#4d96ff" radius-bottom="0.022" radius-top="0"
+                height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
+      </a-entity>
+    </a-circle>
+
+  </a-entity>
+
+  <!-- ── Hologram Jantung 3D ── -->
+  <a-entity id="heart-hologram"
+            gltf-model="#cardiac-model"
+            position="-0.5 1.55 -0.8"
+            scale="1.2 1.2 1.2"
+            rotation="0 0 0">
+  </a-entity>
+
+  <!-- Label view di atas hologram -->
+  <a-text id="view-label-3d"
+          value="PLAX — Parasternal Long Axis"
+          align="center"
+          color="#00ff88"
+          width="1.4"
+          position="-0.5 2.05 -0.8">
+  </a-text>
+
+  <!-- ── Panel Instruksi 3D (mengambang di scene) ── -->
+  <!-- Gunakan a-plane sebagai background terpisah agar teks tidak terpotong -->
+  <a-entity id="ui-3d-panel" position="-0.3 1.92 -1.0">
+    <!-- Background biru solid -->
+    <a-plane width="0.72" height="0.21"
+             color="#03254e" opacity="0.93"
+             position="0 0 -0.003"></a-plane>
+    <!-- Border tipis atas -->
+    <a-plane width="0.72" height="0.006"
+             color="#00aaff" opacity="0.9"
+             position="0 0.102 -0.002"></a-plane>
+    <!-- Teks instruksi — wrap-count agar tidak terpotong -->
+    <a-text id="ui-3d-text"
+            value="Dekatkan probe ke lingkaran MERAH\n(Left Sternal Border ICS 3-4)"
+            align="center"
+            color="#ffffff"
+            width="1.55"
+            wrap-count="36"
+            position="0 0 0.001">
+    </a-text>
+  </a-entity>
+
+  <!-- ── Kamera + Desktop Probe ── -->
+  <a-entity id="rig" position="0 0 0">
+    <a-camera look-controls wasd-controls="acceleration:15; fly:false;"
+              position="0 1.6 0" camera="near:0.001; far:1000;">
+      <a-entity id="desktop-probe"
+                gltf-model="#probe-model"
+                position="0 -0.3 -0.5"
+                rotation="45 340 -20"
+                scale="0.0008 0.0008 0.0008">
+      </a-entity>
+    </a-camera>
+    <!-- VR: tangan kanan -->
+    <a-entity id="right-hand" laser-controls="hand: right">
+      <a-entity id="vr-probe-model"
+                gltf-model="#probe-model"
+                rotation="90 180 0"
+                position="0 -10 -0.1"
+                scale="0.02 0.02 0.02">
+      </a-entity>
+    </a-entity>
+  </a-entity>
+
+  <!-- Lantai -->
+  <a-plane position="0 0 0" rotation="-90 0 0"
+           width="20" height="20" color="#0d1017"></a-plane>
+
+</a-scene>
+
+<!-- ════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════ -->
+<script>
+
+/* ─────────────────────────────────────────────────────────────
+   1. DATA KLINIS — 4 VIEW STANDAR TTE
+   ─────────────────────────────────────────────────────────────
+   Semua data berdasarkan panduan ASE (American Society of
+   Echocardiography) untuk Transthoracic Echocardiography.
+───────────────────────────────────────────────────────────── */
+const VIEWS = {
+
+  plax: {
+    name:      'Parasternal Long Axis (PLAX)',
+    subtitle:  'View Standar TTE #1',
+    color:     '#ff6b6b',
+    position:  'Left sternal border, ICS 3–4',
+    marker:    'Arah bahu kanan pasien (jam 10–11)',
+    angle:     'Hampir tegak lurus dinding dada',
+    structures:'RV (anterior) · Septum interventrikular · LV · Katup Mitral · LA · Aortic Root · Katup Aorta · Posterior Wall',
+    tip:       'Aortic root harus tampak horizontal. Jika miring, rotasi probe searah jarum jam.',
+    heartRot:  '0 -20 0',
+    heartScale:'1.2 1.2 1.2',
+    label3d:   'PLAX — Parasternal Long Axis',
+    instruc3d: 'Dekatkan probe ke lingkaran MERAH\n(Left Sternal Border ICS 3-4)',
+    targetId:  'target-parasternal',
+    // Data gambar sonogram 2D
+    sono: {
+      type: 'plax',
+      structures: [
+        { label:'RV', x:0.5, y:0.22, w:0.45, h:0.18, color:'#4a90d9', alpha:0.7 },
+        { label:'IVS', x:0.5, y:0.36, w:0.45, h:0.04, color:'#aaaaaa', alpha:0.8 },
+        { label:'LV', x:0.5, y:0.55, w:0.42, h:0.30, color:'#d94a4a', alpha:0.65 },
+        { label:'MV', x:0.65, y:0.44, w:0.06, h:0.10, color:'#ffffff', alpha:0.9 },
+        { label:'LA', x:0.75, y:0.52, w:0.22, h:0.22, color:'#d97f4a', alpha:0.6 },
+        { label:'Ao', x:0.73, y:0.30, w:0.15, h:0.18, color:'#d4d44a', alpha:0.7 },
+      ]
+    }
+  },
+
+  psax: {
+    name:      'Parasternal Short Axis (PSAX)',
+    subtitle:  'View Standar TTE #2 — Rotasi 90° dari PLAX',
+    color:     '#ffd93d',
+    position:  'Left sternal border, ICS 3–4 (sama dengan PLAX)',
+    marker:    'Arah bahu kiri pasien (jam 1–2) — rotasi 90° dari PLAX',
+    angle:     'Tegak lurus dinding dada, orientasi transversal',
+    structures:'LV (cross-section bulat) · RV (bulan sabit di anterior) · Katup Mitral "fish mouth" (di level MV) · Papillary Muscles (di level PM)',
+    tip:       'LV harus tampak BULAT sempurna. Jika oval, perbaiki angulasi. Marker ke arah kiri pasien untuk level katup mitral.',
+    heartRot:  '90 0 0',
+    heartScale:'1.1 1.1 1.1',
+    label3d:   'PSAX — Parasternal Short Axis',
+    instruc3d: 'Dekatkan probe ke lingkaran MERAH\n(Sama dengan PLAX, putar probe 90°)',
+    targetId:  'target-parasternal',
+    sono: {
+      type: 'psax',
+      structures: [
+        { label:'RV', x:0.5, y:0.28, w:0.60, h:0.22, color:'#4a90d9', alpha:0.65, shape:'crescent' },
+        { label:'LV', x:0.5, y:0.58, w:0.50, h:0.48, color:'#d94a4a', alpha:0.65, shape:'circle' },
+        { label:'MV "fish mouth"', x:0.5, y:0.58, w:0.22, h:0.18, color:'#ffffff', alpha:0.5, shape:'fishmooth' },
+      ]
+    }
+  },
+
+  apical4: {
+    name:      'Apical 4-Chamber (A4C)',
+    subtitle:  'View Standar TTE #3',
+    color:     '#6bcb77',
+    position:  'Apex jantung: ICS 5, linea mid-clavicularis kiri (atau sedikit lateral)',
+    marker:    'Arah kiri pasien (jam 3). Posisi pasien: left lateral decubitus.',
+    angle:     'Probe hampir horizontal, diarahkan ke basis jantung (superior)',
+    structures:'LV (kanan gambar) · RV (kiri gambar) · LA (kanan atas) · RA (kiri atas) · Katup Mitral · Katup Trikuspid · Septum Interventrikuler · Septum Interatrial',
+    tip:       'Keempat ruang harus terlihat simetris. Jika RV terlalu dominan, angulasikan probe sedikit ke arah sternum.',
+    heartRot:  '20 60 -10',
+    heartScale:'1.3 1.3 1.3',
+    label3d:   'Apical 4-Chamber (A4C)',
+    instruc3d: 'Dekatkan probe ke lingkaran HIJAU\n(Apex: ICS 5, mid-clavicular kiri)',
+    targetId:  'target-apical',
+    sono: {
+      type: 'apical4',
+      structures: [
+        { label:'LV', x:0.67, y:0.62, w:0.32, h:0.52, color:'#d94a4a', alpha:0.7 },
+        { label:'RV', x:0.33, y:0.62, w:0.28, h:0.44, color:'#4a90d9', alpha:0.65 },
+        { label:'LA', x:0.67, y:0.25, w:0.28, h:0.28, color:'#d97f4a', alpha:0.6 },
+        { label:'RA', x:0.33, y:0.25, w:0.25, h:0.25, color:'#9b59b6', alpha:0.55 },
+        { label:'MV', x:0.60, y:0.44, w:0.06, h:0.12, color:'#fff', alpha:0.9 },
+        { label:'TV', x:0.40, y:0.44, w:0.06, h:0.10, color:'#fff', alpha:0.9 },
+        { label:'IVS', x:0.50, y:0.58, w:0.04, h:0.48, color:'#ddd', alpha:0.7 },
+      ]
+    }
+  },
+
+  subcostal: {
+    name:      'Subcostal (Subxiphoid)',
+    subtitle:  'View Standar TTE #4',
+    color:     '#4d96ff',
+    position:  'Di bawah processus xiphoideus, sudut ~15° dari horizontal',
+    marker:    'Arah kiri pasien. Probe hampir rata dengan perut.',
+    angle:     'Sangat miring (~15–30° dari bidang horizontal), diarahkan superior ke jantung',
+    structures:'RV (anterior/atas) · LV (posterior) · LA · RA · Perikardium · IVC (inferior vena cava) · Hepatik vein',
+    tip:       'View terbaik untuk mendeteksi perikardial efusi. Minta pasien tarik napas dalam agar jantung turun lebih dekat ke probe.',
+    heartRot:  '85 0 10',
+    heartScale:'1.0 1.0 1.0',
+    label3d:   'Subcostal (Subxiphoid)',
+    instruc3d: 'Dekatkan probe ke lingkaran BIRU\n(Subxiphoid — probe hampir horizontal)',
+    arrowRot:  '45 0 0',
+    targetId:  'target-subcostal',
+    sono: {
+      type: 'subcostal',
+      structures: [
+        { label:'Hepar', x:0.5, y:0.18, w:0.90, h:0.18, color:'#8B4513', alpha:0.55 },
+        { label:'RV', x:0.50, y:0.38, w:0.55, h:0.22, color:'#4a90d9', alpha:0.65 },
+        { label:'LV', x:0.60, y:0.60, w:0.35, h:0.28, color:'#d94a4a', alpha:0.65 },
+        { label:'RA', x:0.28, y:0.50, w:0.22, h:0.22, color:'#9b59b6', alpha:0.55 },
+        { label:'LA', x:0.55, y:0.78, w:0.25, h:0.18, color:'#d97f4a', alpha:0.55 },
+        { label:'IVC', x:0.15, y:0.62, w:0.08, h:0.30, color:'#4488bb', alpha:0.7 },
+        { label:'Perikardium', x:0.5, y:0.52, w:0.75, h:0.60, color:'#00ff88', alpha:0.12, shape:'outline' },
+      ]
+    }
+  }
+};
+
+let currentViewId = 'plax';
+
+
+/* ─────────────────────────────────────────────────────────────
+   2. SONOGRAM 2D — CANVAS
+───────────────────────────────────────────────────────────── */
+function drawSonogram(viewId) {
+  const canvas = document.getElementById('sonogram-canvas');
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const view = VIEWS[viewId];
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background USG: sektor hitam
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Gambar sektor USG (fan/pie shape)
+  const cx = W / 2, cy = 8;
+  const r  = H * 1.05;
+  const a1 = Math.PI * 0.18, a2 = Math.PI * 0.82;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, r, a1, a2);
+  ctx.closePath();
+  ctx.fillStyle = '#0a1a10';
+  ctx.fill();
+  ctx.restore();
+
+  // Clip semua gambar ke dalam sektor
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, r, a1, a2);
+  ctx.closePath();
+  ctx.clip();
+
+  // Grid USG (garis kedalaman)
+  for (let d = 0.25; d <= 1.0; d += 0.25) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * d * 0.95, a1, a2);
+    ctx.strokeStyle = 'rgba(0,100,60,0.25)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Gambar struktur
+  const sono = view.sono;
+  sono.structures.forEach(s => {
+    const sx = s.x * W;
+    const sy = cy + (s.y * (H - cy) * 0.95);
+    const sw = s.w * W * 0.45;
+    const sh = s.h * H * 0.45;
+
+    ctx.globalAlpha = s.alpha;
+
+    if (s.shape === 'circle') {
+      // LV pada PSAX: lingkaran
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, sw * 0.55, sh * 0.55, 0, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+    } else if (s.shape === 'crescent') {
+      // RV pada PSAX: bulan sabit
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, sw * 0.75, sh * 0.6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      // Hapus tengah untuk buat bulan sabit
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy + sh * 0.35, sw * 0.55, sh * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    } else if (s.shape === 'outline') {
+      // Perikardium: outline saja
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, sw * 0.55, sh * 0.45, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      // Default: elips
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, sw * 0.5, sh * 0.45, 0, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1.0;
+
+    // Label
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(s.label, sx, sy);
+  });
+
+  ctx.restore(); // end clip
+
+  // Watermark view name
+  ctx.fillStyle = 'rgba(0,255,136,0.6)';
+  ctx.font = '10px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(view.name, 6, 4);
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   3. SELECT VIEW — Update semua panel & 3D scene
+───────────────────────────────────────────────────────────── */
+function selectView(viewId) {
+  const v = VIEWS[viewId];
+  if (!v) return;
+  currentViewId = viewId;
+
+  // Tombol aktif
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + viewId).classList.add('active');
+
+  // Panel klinis (kanan)
+  document.getElementById('cp-title').textContent     = v.name;
+  document.getElementById('clinical-subtitle').textContent = v.subtitle;
+  document.getElementById('cp-position').textContent  = v.position;
+  document.getElementById('cp-marker').textContent    = v.marker;
+  document.getElementById('cp-angle').textContent     = v.angle;
+  document.getElementById('cp-structures').textContent= v.structures;
+  document.getElementById('cp-tip').textContent       = v.tip;
+
+  // Label 3D di scene
+  const label = document.getElementById('view-label-3d');
+  if (label) label.setAttribute('value', v.label3d);
+
+  // Instruksi 3D
+  const ui3d = document.getElementById('ui-3d-text');
+  if (ui3d) ui3d.setAttribute('value', v.instruc3d);
+
+  // Hologram jantung: animasi ke orientasi view
+  const heart = document.getElementById('heart-hologram');
+  if (heart) {
+    heart.setAttribute('animation__rot',
+      `property: rotation; to: ${v.heartRot}; dur: 600; easing: easeOutCubic`);
+    heart.setAttribute('animation__scl',
+      `property: scale; to: ${v.heartScale}; dur: 600; easing: easeOutCubic`);
+  }
+
+  // Sonogram 2D
+  drawSonogram(viewId);
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   4. PROBE PROXIMITY DETECTOR
+   Ketika probe (desktop/VR) didekatkan ke target anatomis,
+   auto-switch view dan tampilkan badge.
+───────────────────────────────────────────────────────────── */
+AFRAME.registerComponent('probe-proximity-detector', {
+  init: function () {
+    this.desktopProbe  = document.querySelector('#desktop-probe');
+    this.vrProbe       = document.querySelector('#vr-probe-model');
+    this.tParasternal  = document.querySelector('#target-parasternal');
+    this.tApical       = document.querySelector('#target-apical');
+    this.tSubcostal    = document.querySelector('#target-subcostal');
+    this.badge         = document.getElementById('proximity-badge');
+    this.badgeText     = document.getElementById('proximity-text');
+    this.activeZone    = null;
+    this.dist          = 0.10; // 10 cm radius deteksi
+
+    // Mapping target → panah anak & zona
+    this.targetMap = [
+      { el: this.tParasternal, arrowId: 'arrow-parasternal', zone: 'plax',      label: 'Parasternal (PLAX/PSAX)' },
+      { el: this.tApical,      arrowId: 'arrow-apical',      zone: 'apical4',   label: 'Apical 4-Chamber' },
+      { el: this.tSubcostal,   arrowId: 'arrow-subcostal',   zone: 'subcostal', label: 'Subcostal' }
+    ];
+  },
+
+  tick: function () {
+    const isVR  = this.el.sceneEl.is('vr-mode');
+    const probe = isVR ? this.vrProbe : this.desktopProbe;
+    if (!probe) return;
+
+    const pp = new THREE.Vector3();
+    probe.object3D.getWorldPosition(pp);
+
+    let triggered = false;
+
+    for (const t of this.targetMap) {
+      const tp = new THREE.Vector3();
+      t.el.object3D.getWorldPosition(tp);
+
+      if (pp.distanceTo(tp) < this.dist) {
+        if (this.activeZone !== t.zone) {
+          // Reset semua target
+          this.targetMap.forEach(x => {
+            x.el.setAttribute('opacity', '0.45');
+            const arr = document.querySelector('#' + x.arrowId);
+            if (arr) arr.setAttribute('visible', 'false');
+          });
+
+          this.activeZone = t.zone;
+
+          // Highlight target aktif + tampilkan panahnya
+          t.el.setAttribute('opacity', '0.95');
+          const activeArrow = document.querySelector('#' + t.arrowId);
+          if (activeArrow) activeArrow.setAttribute('visible', 'true');
+
+          // Auto-switch view
+          selectView(t.zone);
+
+          // Badge kiri bawah
+          this.badge.style.display = 'block';
+          this.badgeText.textContent = '✅ Zona ' + t.label + ' terdeteksi!';
+
+          // Update teks 3D panel (pendek agar tidak terpotong)
+          const ui3d = document.getElementById('ui-3d-text');
+          if (ui3d) {
+            const tip = VIEWS[t.zone].tip;
+            // Batasi 55 karakter per baris
+            const tipShort = tip.length > 55 ? tip.substring(0, 55) + '...' : tip;
+            ui3d.setAttribute('value', '✅ ' + t.label + ' terdeteksi!\n' + tipShort);
+          }
         }
+        triggered = true;
+        break;
       }
-    </script>
-  </head>
-  <body>
-    <script type="module">
-      import * as THREE from 'three';
-      import * as xb from 'xrblocks';
+    }
 
-      /**
-       * Immersive 3D medical simulation for an Echocardiogram (Echo) procedure.
-       */
-      class EchoSimulator extends xb.Script {
-        constructor() {
-          super();
-          this.isGrabbing = false;
-          this.grabbedProbe = null;
-          this._handToObject = null;
-
-          // Diagnostics State
-          this.currentState = 'idle'; // idle, apical, parasternal, doppler
-
-          // AI State
-          this.isProcessing = false;
-        }
-
-        init() {
-          // 1. Clinical Lighting Setup
-          this.add(new THREE.HemisphereLight(0xffffff, 0xbbeeff, 1.5));
-          const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-          dirLight.position.set(0, 3, 2);
-          this.add(dirLight);
-
-          // 2. Patient Anatomy (Torso & Heart)
-          this.createPatient();
-
-          // 3. Ultrasound Probe
-          this.createProbe();
-
-          // 4. Clinical Monitor Screen
-          this.createMonitor();
-
-          // Diagnostic Target Zones
-          this.apicalTarget = new THREE.Vector3(0.05, 1.35, -0.45); // Lower left of heart
-          this.parasternalTarget = new THREE.Vector3(-0.02, 1.45, -0.42); // Upper middle
-        }
-
-        createPatient() {
-          this.patientGroup = new THREE.Group();
-          this.patientGroup.position.set(0, 0, -0.6); // Placed in front of user
-
-          // Semi-transparent Torso
-          const torsoGeo = new THREE.CapsuleGeometry(0.25, 0.35, 16, 32);
-          const torsoMat = new THREE.MeshPhysicalMaterial({
-            color: 0xe0d5c1,
-            transparent: true,
-            opacity: 0.25,
-            roughness: 0.2,
-            transmission: 0.8,
-            thickness: 0.1
-          });
-          const torso = new THREE.Mesh(torsoGeo, torsoMat);
-          torso.position.set(0, 1.4, 0);
-          this.patientGroup.add(torso);
-
-          // Animated Heart Group
-          this.heartGroup = new THREE.Group();
-          this.heartGroup.position.set(-0.02, 1.42, -0.1); // Inside torso, slightly left
-          
-          // Left Ventricle (LV) - Main body
-          this.lvMaterial = new THREE.MeshStandardMaterial({ color: 0x992233, roughness: 0.3 });
-          this.lvMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 32, 32), this.lvMaterial);
-          this.lvMesh.scale.set(1, 1.2, 1);
-          this.lvMesh.position.set(0.03, -0.03, 0.02);
-          this.heartGroup.add(this.lvMesh);
-
-          // Right Ventricle (RV)
-          this.rvMaterial = new THREE.MeshStandardMaterial({ color: 0x772233, roughness: 0.4 });
-          this.rvMesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 32), this.rvMaterial);
-          this.rvMesh.position.set(-0.04, -0.02, 0.04);
-          this.heartGroup.add(this.rvMesh);
-
-          // Mitral Valve (Visual representation)
-          this.valveMaterial = new THREE.MeshStandardMaterial({ color: 0xdddddd, emissive: 0x222222 });
-          this.valveMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.01, 16), this.valveMaterial);
-          this.valveMesh.rotation.x = Math.PI / 4;
-          this.valveMesh.position.set(0.01, 0.03, 0.01);
-          this.heartGroup.add(this.valveMesh);
-
-          this.patientGroup.add(this.heartGroup);
-          this.add(this.patientGroup);
-        }
-
-        createProbe() {
-          // Handheld Ultrasound Transducer
-          this.probeGroup = new THREE.Group();
-          // Initial position floating near the patient, ready to be grabbed
-          this.probeGroup.position.set(0.4, 1.3, -0.4); 
-
-          // Probe Handle
-          const handleGeo = new THREE.BoxGeometry(0.03, 0.12, 0.04);
-          const handleMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 });
-          this.probeMesh = new THREE.Mesh(handleGeo, handleMat);
-          this.probeMesh.userData.isProbe = true;
-          
-          // Probe Head
-          const headGeo = new THREE.BoxGeometry(0.035, 0.02, 0.06);
-          const headMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-          const headMesh = new THREE.Mesh(headGeo, headMat);
-          headMesh.position.set(0, -0.06, 0);
-          
-          this.probeMesh.add(headMesh);
-          this.probeGroup.add(this.probeMesh);
-
-          // Simulated Ultrasound Beam (Invisible by default)
-          const beamGeo = new THREE.ConeGeometry(0.15, 0.3, 16);
-          const beamMat = new THREE.MeshBasicMaterial({ 
-            color: 0x00ffff, 
-            transparent: true, 
-            opacity: 0.15,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
-          });
-          this.beamMesh = new THREE.Mesh(beamGeo, beamMat);
-          this.beamMesh.position.set(0, -0.21, 0); // Positioned below the head
-          this.beamMesh.visible = false;
-          this.probeMesh.add(this.beamMesh);
-
-          this.add(this.probeGroup);
-        }
-
-        createMonitor() {
-          this.monitorPanel = new xb.SpatialPanel({
-            width: 0.9,
-            height: 1.1, // Increased height for AI Assistant section
-            backgroundColor: '#0a0f1acc' // Clinical dark blue/black
-          });
-          this.monitorPanel.position.set(-0.8, 1.6, -0.7);
-          this.monitorPanel.rotation.y = Math.PI / 6; // Angled towards user
-          this.add(this.monitorPanel);
-
-          const grid = this.monitorPanel.addGrid();
-
-          // Header
-          grid.addRow({weight: 0.1}).addText({
-            text: 'CARDIAC ULTRASOUND SYSTEM',
-            fontSize: 0.04,
-            fontColor: '#44aaff'
-          });
-
-          // Imaging Area (Mock 2D Screen)
-          const screenRow = grid.addRow({weight: 0.45});
-          this.screenBg = screenRow.addPanel({ backgroundColor: '#000000', showEdge: true });
-          this.echoVisualText = this.screenBg.addGrid().addRow().addText({
-            text: '[ SYSTEM STANDBY ]\n\nPlease apply probe to patient chest.',
-            fontSize: 0.05,
-            fontColor: '#555555'
-          });
-
-          // Diagnostics / Telemetry Area
-          const diagRow = grid.addRow({weight: 0.2});
-          this.diagPanel = diagRow.addPanel({ backgroundColor: '#112233aa' });
-          const diagGrid = this.diagPanel.addGrid();
-          this.diagTitle = diagGrid.addRow({weight: 0.4}).addText({
-            text: 'Diagnostics: Not Active',
-            fontSize: 0.045,
-            fontColor: '#aaaaaa'
-          });
-          this.diagDetails = diagGrid.addRow({weight: 0.6}).addText({
-            text: '---',
-            fontSize: 0.05,
-            fontColor: '#ffffff'
-          });
-
-          // AI Assistant Area
-          const aiRow = grid.addRow({weight: 0.25});
-          this.aiPanel = aiRow.addPanel({ backgroundColor: '#1a1a2eaa' });
-          const aiGrid = this.aiPanel.addGrid();
-          
-          this.aiDisplay = new xb.ScrollingTroikaTextView({
-            text: '✨ AI Assistant Ready. Position the probe and select an action.',
-            fontSize: 0.035,
-            fontColor: '#b0c4de'
-          });
-          aiGrid.addRow({weight: 0.7}).add(this.aiDisplay);
-
-          const btnRow = aiGrid.addRow({weight: 0.3});
-          const explainBtn = btnRow.addCol({weight: 0.5}).addTextButton({
-            text: '✨ Explain Findings',
-            fontSize: 0.035,
-            backgroundColor: '#2b5b84',
-            fontColor: '#ffffff'
-          });
-          explainBtn.onTriggered = () => this.explainFindings();
-
-          const reportBtn = btnRow.addCol({weight: 0.5}).addTextButton({
-            text: '✨ Draft Report',
-            fontSize: 0.035,
-            backgroundColor: '#2b845b',
-            fontColor: '#ffffff'
-          });
-          reportBtn.onTriggered = () => this.draftReport();
-        }
-
-        async explainFindings() {
-          if (this.isProcessing || !xb.core.ai?.isAvailable()) return;
-          this.isProcessing = true;
-          this.aiDisplay.setText('✨ Analyzing findings...');
-          
-          const finding = this.diagDetails.text;
-          const focus = this.diagTitle.text;
-
-          const prompt = `You are an expert cardiologist AI assistant. Explain the following echocardiogram observation to a medical student simply but accurately. Focus area: ${focus}. Finding: ${finding}. Keep the response strictly under 3 sentences.`;
-
-          try {
-            const response = await xb.core.ai.query({
-              type: 'multiPart',
-              parts: [{text: prompt}]
-            });
-            this.aiDisplay.setText(`🤖 AI: ${response.text}\n\n`);
-          } catch (error) {
-            this.aiDisplay.setText(`❌ Error: ${error.message}\n\n`);
-          }
-          this.isProcessing = false;
-        }
-
-        async draftReport() {
-          if (this.isProcessing || !xb.core.ai?.isAvailable()) return;
-          this.isProcessing = true;
-          this.aiDisplay.setText('✨ Drafting clinical report...');
-          
-          const finding = this.diagDetails.text;
-          const focus = this.diagTitle.text;
-
-          const prompt = `Write a professional echocardiogram clinical report summary based on this observation. Area: ${focus}. Observation: ${finding}. Keep it concise, strictly under 40 words, and use standard medical terminology.`;
-
-          try {
-            const response = await xb.core.ai.query({
-              type: 'multiPart',
-              parts: [{text: prompt}]
-            });
-            this.aiDisplay.setText(`📝 Report: ${response.text}\n\n`);
-          } catch (error) {
-            this.aiDisplay.setText(`❌ Error: ${error.message}\n\n`);
-          }
-          this.isProcessing = false;
-        }
-
-        // --- Interaction: Grabbing the Probe ---
-        
-        onObjectGrabStart(event) {
-          if (this.isGrabbing) return;
-          const target = event.object;
-          
-          if (target && target.userData.isProbe) {
-            this.isGrabbing = true;
-            this.grabbedProbe = target;
-
-            this.probeGroup.updateMatrixWorld(true);
-            event.hand.updateMatrixWorld(true);
-
-            const H0inv = new THREE.Matrix4().copy(event.hand.matrixWorld).invert();
-            const O0 = new THREE.Matrix4().copy(this.probeGroup.matrixWorld);
-            this._handToObject = new THREE.Matrix4().multiplyMatrices(H0inv, O0);
-          }
-        }
-
-        onObjectGrabbing(event) {
-          if (!this.isGrabbing || !this._handToObject || !this.grabbedProbe) return;
-
-          event.hand.updateMatrixWorld(true);
-          const H = new THREE.Matrix4().copy(event.hand.matrixWorld);
-          const O = new THREE.Matrix4().multiplyMatrices(H, this._handToObject);
-          
-          const pos = new THREE.Vector3();
-          const quat = new THREE.Quaternion();
-          const scl = new THREE.Vector3();
-          O.decompose(pos, quat, scl);
-
-          this.probeGroup.position.copy(pos);
-          this.probeGroup.quaternion.copy(quat);
-        }
-
-        onObjectGrabEnd(event) {
-          this.isGrabbing = false;
-          this.grabbedProbe = null;
-          this._handToObject = null;
-          this.beamMesh.visible = false;
-          this.setMonitorState('idle');
-        }
-
-        // --- Core Update Loop (Animation & Logic) ---
-
-        update() {
-          const now = performance.now();
-          
-          // 1. Animate Heartbeat (Realistic Lub-Dub pattern)
-          // Cycle duration ~ 1000ms (60 BPM)
-          const t = (now % 1000) / 1000;
-          let scale = 1.0;
-          if (t < 0.2) {
-            // Systole (contraction)
-            scale = 1.0 - Math.sin(t * Math.PI * 5) * 0.08;
-          } else if (t > 0.3 && t < 0.5) {
-            // Diastole subtle secondary beat
-            scale = 1.0 - Math.sin((t - 0.3) * Math.PI * 5) * 0.03;
-          }
-          this.heartGroup.scale.set(scale, scale, scale);
-
-          // 2. Probe Collision & Diagnostics Mapping
-          if (this.isGrabbing) {
-            const probePos = new THREE.Vector3();
-            this.probeMesh.getWorldPosition(probePos);
-
-            // Calculate distances to cardiac windows
-            const distApical = probePos.distanceTo(this.apicalTarget);
-            const distParasternal = probePos.distanceTo(this.parasternalTarget);
-
-            // Thresholds
-            const hoverDist = 0.15;
-            const pressDist = 0.06; // Pressing hard activates Color Doppler
-
-            let newState = 'idle';
-
-            if (distApical < hoverDist) {
-              newState = distApical < pressDist ? 'apical_doppler' : 'apical';
-            } else if (distParasternal < hoverDist) {
-              newState = distParasternal < pressDist ? 'parasternal_doppler' : 'parasternal';
-            } else if (distApical < 0.3 || distParasternal < 0.3) {
-              newState = 'searching';
-            }
-
-            this.setMonitorState(newState);
-            
-            // Show beam when close to chest
-            this.beamMesh.visible = (newState !== 'idle' && newState !== 'searching');
-          }
-        }
-
-        setMonitorState(state) {
-          if (this.currentState === state) return;
-          this.currentState = state;
-
-          // Reset Highlights
-          this.lvMesh.material.emissive.setHex(0x000000);
-          this.valveMesh.material.emissive.setHex(0x222222);
-          this.lvMaterial.color.setHex(0x992233);
-          this.rvMaterial.color.setHex(0x772233);
-          this.beamMesh.material.color.setHex(0x00ffff);
-
-          switch (state) {
-            case 'idle':
-              this.echoVisualText.setText('[ SYSTEM STANDBY ]\n\nPlease apply probe to patient chest.');
-              this.echoVisualText.setFontColor('#555555');
-              this.diagTitle.setText('Diagnostics: Not Active');
-              this.diagDetails.setText('---');
-              break;
-
-            case 'searching':
-              this.echoVisualText.setText('~ Poor Acoustic Window ~\nAdjust position...');
-              this.echoVisualText.setFontColor('#aaaa00');
-              this.diagTitle.setText('Diagnostics: Searching');
-              this.diagDetails.setText('Signal too weak');
-              break;
-
-            case 'apical':
-              this.echoVisualText.setText('//// APICAL 4-CHAMBER VIEW ////\n\n(Simulated 2D Echo active)');
-              this.echoVisualText.setFontColor('#dddddd');
-              this.diagTitle.setText('Focus: Left Ventricle');
-              this.diagDetails.setText('Ejection Fraction: Normal (60%)');
-              this.diagDetails.setFontColor('#00ff44');
-              this.lvMesh.material.emissive.setHex(0x441111); // Highlight LV
-              break;
-
-            case 'apical_doppler':
-              this.echoVisualText.setText('[[ COLOR DOPPLER ACTIVE ]]\n\nApical 4-Chamber Flow');
-              this.echoVisualText.setFontColor('#ff4444');
-              this.diagTitle.setText('Focus: Ventricular Blood Flow');
-              this.diagDetails.setText('Velocity: Normal | Direction: Stable');
-              this.diagDetails.setFontColor('#ffaa00');
-              // Doppler Visuals: Red (towards), Blue (away)
-              this.lvMaterial.color.setHex(0xff1111);
-              this.rvMaterial.color.setHex(0x1144ff);
-              this.beamMesh.material.color.setHex(0xffaa44);
-              break;
-
-            case 'parasternal':
-              this.echoVisualText.setText('//// PARASTERNAL LONG AXIS ////\n\n(Simulated 2D Echo active)');
-              this.echoVisualText.setFontColor('#dddddd');
-              this.diagTitle.setText('Focus: Mitral Valve');
-              this.diagDetails.setText('Status: Normal Flow / No Regurgitation');
-              this.diagDetails.setFontColor('#00ff44');
-              this.valveMesh.material.emissive.setHex(0x666666); // Highlight Valve
-              break;
-
-            case 'parasternal_doppler':
-              this.echoVisualText.setText('[[ COLOR DOPPLER ACTIVE ]]\n\nParasternal Long Axis Flow');
-              this.echoVisualText.setFontColor('#ff4444');
-              this.diagTitle.setText('Focus: Valvular Hemodynamics');
-              this.diagDetails.setText('Trace Mitral Regurgitation (Benign)');
-              this.diagDetails.setFontColor('#ffaa00');
-              // Doppler Visuals
-              this.lvMaterial.color.setHex(0xff1111);
-              this.valveMesh.material.emissive.setHex(0xffaa44);
-              this.beamMesh.material.color.setHex(0xffaa44);
-              break;
-          }
-        }
-      }
-
-      document.addEventListener('DOMContentLoaded', function () {
-        const options = new xb.Options();
-        options.enableUI();
-        options.enableHands();
-        options.enableAI(); // Enabled Gemini AI capabilities
-        
-        // Ensure joints/meshes are visible so the user knows where their hands are
-        options.hands.visualization = true;
-        options.hands.visualizeJoints = true;
-        
-        xb.add(new EchoSimulator());
-        xb.init(options);
+    if (!triggered && this.activeZone !== null) {
+      this.activeZone = null;
+      this.badge.style.display = 'none';
+      this.targetMap.forEach(x => {
+        x.el.setAttribute('opacity', '0.5');
+        const arr = document.querySelector('#' + x.arrowId);
+        if (arr) arr.setAttribute('visible', 'false');
       });
-    </script>
-  </body>
-</html>
+      const ui3d = document.getElementById('ui-3d-text');
+      if (ui3d) ui3d.setAttribute('value', VIEWS[currentViewId].instruc3d);
+    }
+  }
+});
+
+document.querySelector('a-scene').setAttribute('probe-proximity-detector', '');
+
+
+/* ─────────────────────────────────────────────────────────────
+   5. LOADING HANDLER
+───────────────────────────────────────────────────────────── */
+document.querySelector('a-scene').addEventListener('loaded', () => {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('ui-panel').style.display       = 'block';
+  document.getElementById('clinical-panel').style.display = 'block';
+  document.getElementById('sonogram-panel').style.display = 'block';
+  selectView('plax');
+  document.getElementById('btn-plax').classList.add('active');
+});
+
+</script>
+</body>
+</html> 
