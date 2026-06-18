@@ -94,19 +94,41 @@
     #sonogram-panel {
       position: fixed; bottom: 20px; right: 20px;
       z-index: 9999;
-      background: rgba(5, 15, 35, 0.93);
+      background: rgba(5, 15, 35, 0.95);
       border: 1px solid #1e3a5f;
-      padding: 12px; border-radius: 12px;
+      padding: 12px 14px; border-radius: 12px;
       color: white; font-family: Arial, sans-serif;
-      display: none;
+      display: none; width: 420px;
     }
     #sonogram-panel h4 {
-      margin: 0 0 8px; font-size: 12px;
-      color: #7a9cbb; text-align: center; letter-spacing: 1px;
+      margin: 0 0 10px; font-size: 12px;
+      color: #7a9cbb; text-align: center;
+      letter-spacing: 1px; text-transform: uppercase;
     }
-    #sonogram-canvas {
-      display: block; border-radius: 8px;
-      background: #000;
+    #sono-container {
+      display: flex; gap: 10px;
+    }
+    .sono-col {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    }
+    .sono-label {
+      font-size: 10px; color: #7a9cbb;
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 3px 8px; background: #0d1b2a;
+      border-radius: 4px; width: 100%; text-align: center;
+    }
+    .sono-img {
+      width: 100%; height: 160px;
+      object-fit: cover; border-radius: 7px;
+      border: 1px solid #1e3a5f; background: #000;
+    }
+    .sono-img-error {
+      width: 100%; height: 160px;
+      background: #0d1b2a; border-radius: 7px;
+      border: 1px dashed #1e3a5f;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #3a5a7c; text-align: center;
+      padding: 10px;
     }
 
     /* ══ Probe proximity badge ══ */
@@ -175,12 +197,29 @@
 
 <!-- Sonogram 2D (kanan bawah) -->
 <div id="sonogram-panel">
-  <h4>SIMULASI TAMPILAN USG</h4>
-  <canvas id="sonogram-canvas" width="260" height="200"></canvas>
+  <h4>📡 Simulasi Tampilan USG</h4>
+  <div id="sono-container">
+    <div class="sono-col">
+      <div class="sono-label">📷 Foto Still</div>
+      <img id="sono-image" class="sono-img" src="" alt="USG Still"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+      <div class="sono-img-error" style="display:none">
+        Gambar belum tersedia.<br>Isi URL di kode bagian VIEWS.
+      </div>
+    </div>
+    <div class="sono-col">
+      <div class="sono-label">🎞️ Live Echo (GIF)</div>
+      <img id="sono-gif" class="sono-img" src="" alt="USG GIF"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+      <div class="sono-img-error" style="display:none">
+        GIF belum tersedia.<br>Isi URL di kode bagian VIEWS.
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Proximity badge -->
-<div id="proximity-badge" id="proximity-badge">
+<div id="proximity-badge">
   ✅ <span id="proximity-text">Probe di zona PLAX</span>
 </div>
 
@@ -213,67 +252,64 @@
 
     <a-entity gltf-model="#patient-model" rotation="0 90 0" scale="0.01 0.01 0.01"></a-entity>
 
-    <!-- TARGET 1: PLAX / PSAX — Left Sternal Border ICS 3-4
-         Geser ke arah kepala (z negatif), dada atas -->
+    <!-- TARGET 1: PLAX / PSAX — Left Sternal Border ICS 3-4 -->
     <a-circle id="target-parasternal"
-              color="#ff6b6b" radius="0.05"
-              rotation="-90 0 0" position="0.05 0.16 -0.42"
+              color="#d53442" radius="0.05"
+              rotation="-90 90 0" position="-0.40 0.255 -0.005"
               opacity="0.55">
       <a-animation attribute="opacity" from="0.35" to="0.85"
                    dur="900" direction="alternate" repeat="indefinite"></a-animation>
       <a-text value="PLAX / PSAX" align="center"
               position="0 0 0.01" scale="0.09 0.09 0.09" color="#ffdddd"></a-text>
-      <!-- Panah ke bawah di atas titik ini (muncul saat aktif) -->
-      <a-entity id="arrow-parasternal" position="0 0.18 0" visible="false" rotation="0 0 0">
-        <a-cylinder color="#ff6b6b" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
-        <a-cone color="#ff6b6b" radius-bottom="0.022" radius-top="0"
-                height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
-      </a-entity>
     </a-circle>
+    <!-- Panah PLAX: tepat di atas target-parasternal, koordinat sama X/Z, Y sedikit lebih tinggi -->
+    <a-entity id="arrow-parasternal" position="-0.40 0.37 -0.005" visible="false">
+      <a-cylinder color="#d53442" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
+      <a-cone color="#d53442" radius-bottom="0.022" radius-top="0"
+              height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
+    </a-entity>
 
-    <!-- TARGET 2: Apical 4C — ICS 5, mid-clavicular kiri
-         Lebih ke kiri (+X), sedikit lebih ke kaki dari PLAX -->
+    <!-- TARGET 2: Apical 4C — ICS 5, mid-clavicular kiri -->
     <a-circle id="target-apical"
-              color="#6bcb77" radius="0.05"
-              rotation="-90 0 0" position="0.18 0.16 -0.33"
+              color="#4bd534" radius="0.05"
+              rotation="-90 90 0" position="-0.34 0.255 -0.112"
               opacity="0.55">
       <a-animation attribute="opacity" from="0.35" to="0.85"
                    dur="1000" direction="alternate" repeat="indefinite"></a-animation>
       <a-text value="Apical 4C" align="center"
               position="0 0 0.01" scale="0.09 0.09 0.09" color="#ccffcc"></a-text>
-      <!-- Panah ke bawah di atas titik ini -->
-      <a-entity id="arrow-apical" position="0 0.18 0" visible="false">
-        <a-cylinder color="#6bcb77" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
-        <a-cone color="#6bcb77" radius-bottom="0.022" radius-top="0"
-                height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
-      </a-entity>
     </a-circle>
+    <!-- Panah Apical: tepat di atas target-apical -->
+    <a-entity id="arrow-apical" position="-0.34 0.37 -0.112" visible="false">
+      <a-cylinder color="#4bd534" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
+      <a-cone color="#4bd534" radius-bottom="0.022" radius-top="0"
+              height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
+    </a-entity>
 
-    <!-- TARGET 3: Subcostal — Subxiphoid
-         Tengah X, di bawah xiphoid (antara sternum dan pusar) -->
+    <!-- TARGET 3: Subcostal — Subxiphoid -->
     <a-circle id="target-subcostal"
-              color="#4d96ff" radius="0.05"
-              rotation="-90 0 0" position="0.0 0.16 -0.22"
+              color="#3472d5" radius="0.05"
+              rotation="-90 90 0" position="-0.28 0.255 -0.019"
               opacity="0.55">
       <a-animation attribute="opacity" from="0.35" to="0.85"
                    dur="1100" direction="alternate" repeat="indefinite"></a-animation>
       <a-text value="Subcostal" align="center"
               position="0 0 0.01" scale="0.09 0.09 0.09" color="#cce0ff"></a-text>
-      <!-- Panah ke bawah di atas titik ini -->
-      <a-entity id="arrow-subcostal" position="0 0.18 0" visible="false">
-        <a-cylinder color="#4d96ff" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
-        <a-cone color="#4d96ff" radius-bottom="0.022" radius-top="0"
-                height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
-      </a-entity>
     </a-circle>
+    <!-- Panah Subcostal: tepat di atas target-subcostal -->
+    <a-entity id="arrow-subcostal" position="-0.28 0.37 -0.019" visible="false">
+      <a-cylinder color="#3472d5" radius="0.008" height="0.10" position="0 0.05 0"></a-cylinder>
+      <a-cone color="#3472d5" radius-bottom="0.022" radius-top="0"
+              height="0.06" position="0 -0.02 0" rotation="180 0 0"></a-cone>
+    </a-entity>
 
   </a-entity>
 
   <!-- ── Hologram Jantung 3D ── -->
   <a-entity id="heart-hologram"
             gltf-model="#cardiac-model"
-            position="-0.5 1.55 -0.8"
-            scale="1.2 1.2 1.2"
+            position="-0.980 1.352 -0.813"
+            scale="3.1 3.1 3.1"
             rotation="0 0 0">
   </a-entity>
 
@@ -283,28 +319,28 @@
           align="center"
           color="#00ff88"
           width="1.4"
-          position="-0.5 2.05 -0.8">
+          position="-1.150 1.605 -0.709"
+          rotation="0 90 0">
   </a-text>
 
   <!-- ── Panel Instruksi 3D (mengambang di scene) ── -->
-  <!-- Gunakan a-plane sebagai background terpisah agar teks tidak terpotong -->
   <a-entity id="ui-3d-panel" position="-0.3 1.92 -1.0">
     <!-- Background biru solid -->
-    <a-plane width="0.72" height="0.21"
+    <a-plane width="1.1088" height="0.51408"
              color="#03254e" opacity="0.93"
-             position="0 0 -0.003"></a-plane>
+             position="-0.059 0.231 -2.354"></a-plane>
     <!-- Border tipis atas -->
-    <a-plane width="0.72" height="0.006"
+    <a-plane width="1.1088" height="0.006"
              color="#00aaff" opacity="0.9"
-             position="0 0.102 -0.002"></a-plane>
-    <!-- Teks instruksi — wrap-count agar tidak terpotong -->
+             position="0 0.473 -2.311"></a-plane>
+    <!-- Teks instruksi -->
     <a-text id="ui-3d-text"
             value="Dekatkan probe ke lingkaran MERAH\n(Left Sternal Border ICS 3-4)"
             align="center"
             color="#ffffff"
-            width="1.55"
+            width="1"
             wrap-count="36"
-            position="0 0 0.001">
+            position="-0.070 0.205 -2.162">
     </a-text>
   </a-entity>
 
@@ -343,9 +379,6 @@
 
 /* ─────────────────────────────────────────────────────────────
    1. DATA KLINIS — 4 VIEW STANDAR TTE
-   ─────────────────────────────────────────────────────────────
-   Semua data berdasarkan panduan ASE (American Society of
-   Echocardiography) untuk Transthoracic Echocardiography.
 ───────────────────────────────────────────────────────────── */
 const VIEWS = {
 
@@ -363,7 +396,8 @@ const VIEWS = {
     label3d:   'PLAX — Parasternal Long Axis',
     instruc3d: 'Dekatkan probe ke lingkaran MERAH\n(Left Sternal Border ICS 3-4)',
     targetId:  'target-parasternal',
-    // Data gambar sonogram 2D
+    imageSrc:  'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Cardiac-Ultrasound-Echocardiography-Parasternal-Long-Axis-View-PSLA-PLAX-Illustration.png',
+    gifSrc:    'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Parasternal-Long-Axis-View-Ultrasound-Echocardiography-Video-eFAST-FAST-scan-POCUS.gif',
     sono: {
       type: 'plax',
       structures: [
@@ -391,6 +425,8 @@ const VIEWS = {
     label3d:   'PSAX — Parasternal Short Axis',
     instruc3d: 'Dekatkan probe ke lingkaran MERAH\n(Sama dengan PLAX, putar probe 90°)',
     targetId:  'target-parasternal',
+    imageSrc:  'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Cardiac-Ultrasound-Echocardiography-Parasternal-Short-Axis-View-PSSA-PSAX-Mitral-Valve-Fish-Mouth-Illustration-610x542.png',
+    gifSrc:    'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Cardiac-Ultrasound-Echocardiography-Parasternal-Short-Axis-View-PSSA-PSAX-Mitral-Valve-Fish-Mouth-Ultrasound-Video.gif',
     sono: {
       type: 'psax',
       structures: [
@@ -415,6 +451,8 @@ const VIEWS = {
     label3d:   'Apical 4-Chamber (A4C)',
     instruc3d: 'Dekatkan probe ke lingkaran HIJAU\n(Apex: ICS 5, mid-clavicular kiri)',
     targetId:  'target-apical',
+    imageSrc:  'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Cardiac-Ultrasound-Echocardiography-Apical-4-Chamber-view-A4C-Illustration.png',
+    gifSrc:    'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Cardiac-Ultrasound-Echocardiography-Apical-4-Chamber-view-A4C-Ultrasound-Video.gif',
     sono: {
       type: 'apical4',
       structures: [
@@ -442,8 +480,9 @@ const VIEWS = {
     heartScale:'1.0 1.0 1.0',
     label3d:   'Subcostal (Subxiphoid)',
     instruc3d: 'Dekatkan probe ke lingkaran BIRU\n(Subxiphoid — probe hampir horizontal)',
-    arrowRot:  '45 0 0',
     targetId:  'target-subcostal',
+    imageSrc:  'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Cardiac-Ultrasound-Echocardiography-Apical-5-Chamber-view-A5C-Illustration-610x469.png',
+    gifSrc:    'https://pocus101.b-cdn.net/wp-content/uploads/2020/11/Cardiac-Ultrasound-Echocardiography-Apical-5-Chamber-view-A5C-Ultrasound-Video.gif',
     sono: {
       type: 'subcostal',
       structures: [
@@ -463,116 +502,7 @@ let currentViewId = 'plax';
 
 
 /* ─────────────────────────────────────────────────────────────
-   2. SONOGRAM 2D — CANVAS
-───────────────────────────────────────────────────────────── */
-function drawSonogram(viewId) {
-  const canvas = document.getElementById('sonogram-canvas');
-  const ctx    = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  const view = VIEWS[viewId];
-
-  ctx.clearRect(0, 0, W, H);
-
-  // Background USG: sektor hitam
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, W, H);
-
-  // Gambar sektor USG (fan/pie shape)
-  const cx = W / 2, cy = 8;
-  const r  = H * 1.05;
-  const a1 = Math.PI * 0.18, a2 = Math.PI * 0.82;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.arc(cx, cy, r, a1, a2);
-  ctx.closePath();
-  ctx.fillStyle = '#0a1a10';
-  ctx.fill();
-  ctx.restore();
-
-  // Clip semua gambar ke dalam sektor
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.arc(cx, cy, r, a1, a2);
-  ctx.closePath();
-  ctx.clip();
-
-  // Grid USG (garis kedalaman)
-  for (let d = 0.25; d <= 1.0; d += 0.25) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * d * 0.95, a1, a2);
-    ctx.strokeStyle = 'rgba(0,100,60,0.25)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-  }
-
-  // Gambar struktur
-  const sono = view.sono;
-  sono.structures.forEach(s => {
-    const sx = s.x * W;
-    const sy = cy + (s.y * (H - cy) * 0.95);
-    const sw = s.w * W * 0.45;
-    const sh = s.h * H * 0.45;
-
-    ctx.globalAlpha = s.alpha;
-
-    if (s.shape === 'circle') {
-      // LV pada PSAX: lingkaran
-      ctx.beginPath();
-      ctx.ellipse(sx, sy, sw * 0.55, sh * 0.55, 0, 0, Math.PI * 2);
-      ctx.fillStyle = s.color;
-      ctx.fill();
-    } else if (s.shape === 'crescent') {
-      // RV pada PSAX: bulan sabit
-      ctx.beginPath();
-      ctx.ellipse(sx, sy, sw * 0.75, sh * 0.6, 0, 0, Math.PI * 2);
-      ctx.fillStyle = s.color;
-      ctx.fill();
-      // Hapus tengah untuk buat bulan sabit
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.beginPath();
-      ctx.ellipse(sx, sy + sh * 0.35, sw * 0.55, sh * 0.55, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-    } else if (s.shape === 'outline') {
-      // Perikardium: outline saja
-      ctx.beginPath();
-      ctx.ellipse(sx, sy, sw * 0.55, sh * 0.45, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    } else {
-      // Default: elips
-      ctx.beginPath();
-      ctx.ellipse(sx, sy, sw * 0.5, sh * 0.45, 0, 0, Math.PI * 2);
-      ctx.fillStyle = s.color;
-      ctx.fill();
-    }
-
-    ctx.globalAlpha = 1.0;
-
-    // Label
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 10px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(s.label, sx, sy);
-  });
-
-  ctx.restore(); // end clip
-
-  // Watermark view name
-  ctx.fillStyle = 'rgba(0,255,136,0.6)';
-  ctx.font = '10px Arial';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(view.name, 6, 4);
-}
-
-
-/* ─────────────────────────────────────────────────────────────
-   3. SELECT VIEW — Update semua panel & 3D scene
+   2. SELECT VIEW — Update semua panel & 3D scene
 ───────────────────────────────────────────────────────────── */
 function selectView(viewId) {
   const v = VIEWS[viewId];
@@ -584,13 +514,13 @@ function selectView(viewId) {
   document.getElementById('btn-' + viewId).classList.add('active');
 
   // Panel klinis (kanan)
-  document.getElementById('cp-title').textContent     = v.name;
+  document.getElementById('cp-title').textContent          = v.name;
   document.getElementById('clinical-subtitle').textContent = v.subtitle;
-  document.getElementById('cp-position').textContent  = v.position;
-  document.getElementById('cp-marker').textContent    = v.marker;
-  document.getElementById('cp-angle').textContent     = v.angle;
-  document.getElementById('cp-structures').textContent= v.structures;
-  document.getElementById('cp-tip').textContent       = v.tip;
+  document.getElementById('cp-position').textContent       = v.position;
+  document.getElementById('cp-marker').textContent         = v.marker;
+  document.getElementById('cp-angle').textContent          = v.angle;
+  document.getElementById('cp-structures').textContent     = v.structures;
+  document.getElementById('cp-tip').textContent            = v.tip;
 
   // Label 3D di scene
   const label = document.getElementById('view-label-3d');
@@ -600,7 +530,7 @@ function selectView(viewId) {
   const ui3d = document.getElementById('ui-3d-text');
   if (ui3d) ui3d.setAttribute('value', v.instruc3d);
 
-  // Hologram jantung: animasi ke orientasi view
+  // Hologram jantung: animasi rotasi & skala sesuai view
   const heart = document.getElementById('heart-hologram');
   if (heart) {
     heart.setAttribute('animation__rot',
@@ -609,15 +539,24 @@ function selectView(viewId) {
       `property: scale; to: ${v.heartScale}; dur: 600; easing: easeOutCubic`);
   }
 
-  // Sonogram 2D
-  drawSonogram(viewId);
+  // Update gambar sonogram (foto + GIF)
+  const sonoImg = document.getElementById('sono-image');
+  const sonoGif = document.getElementById('sono-gif');
+  if (sonoImg) {
+    sonoImg.style.display = v.imageSrc ? 'block' : 'none';
+    sonoImg.nextElementSibling.style.display = v.imageSrc ? 'none' : 'flex';
+    if (v.imageSrc) sonoImg.src = v.imageSrc;
+  }
+  if (sonoGif) {
+    sonoGif.style.display = v.gifSrc ? 'block' : 'none';
+    sonoGif.nextElementSibling.style.display = v.gifSrc ? 'none' : 'flex';
+    if (v.gifSrc) sonoGif.src = v.gifSrc;
+  }
 }
 
 
 /* ─────────────────────────────────────────────────────────────
-   4. PROBE PROXIMITY DETECTOR
-   Ketika probe (desktop/VR) didekatkan ke target anatomis,
-   auto-switch view dan tampilkan badge.
+   3. PROBE PROXIMITY DETECTOR
 ───────────────────────────────────────────────────────────── */
 AFRAME.registerComponent('probe-proximity-detector', {
   init: function () {
@@ -629,9 +568,8 @@ AFRAME.registerComponent('probe-proximity-detector', {
     this.badge         = document.getElementById('proximity-badge');
     this.badgeText     = document.getElementById('proximity-text');
     this.activeZone    = null;
-    this.dist          = 0.10; // 10 cm radius deteksi
+    this.dist          = 0.10;
 
-    // Mapping target → panah anak & zona
     this.targetMap = [
       { el: this.tParasternal, arrowId: 'arrow-parasternal', zone: 'plax',      label: 'Parasternal (PLAX/PSAX)' },
       { el: this.tApical,      arrowId: 'arrow-apical',      zone: 'apical4',   label: 'Apical 4-Chamber' },
@@ -655,7 +593,6 @@ AFRAME.registerComponent('probe-proximity-detector', {
 
       if (pp.distanceTo(tp) < this.dist) {
         if (this.activeZone !== t.zone) {
-          // Reset semua target
           this.targetMap.forEach(x => {
             x.el.setAttribute('opacity', '0.45');
             const arr = document.querySelector('#' + x.arrowId);
@@ -664,23 +601,18 @@ AFRAME.registerComponent('probe-proximity-detector', {
 
           this.activeZone = t.zone;
 
-          // Highlight target aktif + tampilkan panahnya
           t.el.setAttribute('opacity', '0.95');
           const activeArrow = document.querySelector('#' + t.arrowId);
           if (activeArrow) activeArrow.setAttribute('visible', 'true');
 
-          // Auto-switch view
           selectView(t.zone);
 
-          // Badge kiri bawah
           this.badge.style.display = 'block';
           this.badgeText.textContent = '✅ Zona ' + t.label + ' terdeteksi!';
 
-          // Update teks 3D panel (pendek agar tidak terpotong)
           const ui3d = document.getElementById('ui-3d-text');
           if (ui3d) {
             const tip = VIEWS[t.zone].tip;
-            // Batasi 55 karakter per baris
             const tipShort = tip.length > 55 ? tip.substring(0, 55) + '...' : tip;
             ui3d.setAttribute('value', '✅ ' + t.label + ' terdeteksi!\n' + tipShort);
           }
@@ -708,7 +640,7 @@ document.querySelector('a-scene').setAttribute('probe-proximity-detector', '');
 
 
 /* ─────────────────────────────────────────────────────────────
-   5. LOADING HANDLER
+   4. LOADING HANDLER
 ───────────────────────────────────────────────────────────── */
 document.querySelector('a-scene').addEventListener('loaded', () => {
   document.getElementById('loading-screen').style.display = 'none';
@@ -721,4 +653,4 @@ document.querySelector('a-scene').addEventListener('loaded', () => {
 
 </script>
 </body>
-</html> 
+</html>
