@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>VR Echocardiography Teaching App - Probe-Based Tracking</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script>
+      // Komponen utama untuk mendeteksi jarak fisik probe ke target anatomi
+      AFRAME.registerComponent('probe-proximity-detector', {
+        init: function () {
+          // Mengambil referensi elemen yang dibutuhkan
+          this.heartHologram = document.querySelector('#heart-hologram');
+          this.uiText = document.querySelector('#ui-instruction-text');
+          this.guidanceArrow = document.querySelector('#guidance-arrow');
+          
+          this.targetApical = document.querySelector('#target-apical');
+          this.targetSubcostal = document.querySelector('#target-subcostal');
+          
+          // Menyimpan status aktif agar animasi tidak terpicu berulang-ulang
+          this.activeWindow = null;
+          
+          // Menentukan jarak batas aman sentuhan dalam meter (7 cm)
+          this.activationDistance = 0.07; 
+          
+          // Mengambil referensi probe (bisa versi desktop atau versi VR)
+          this.desktopProbe = document.querySelector('#desktop-probe');
+          this.vrProbe = document.querySelector('#vr-probe-model');
+        },
+        
+        tick: function () {
+          // 1. Tentukan probe mana yang sedang aktif digunakan oleh user
+          let activeProbe = this.desktopProbe;
+          // Jika VR sedang berjalan dan controller aktif, gunakan posisi VR probe
+          if (this.el.sceneEl.is('vr-mode')) {
+            activeProbe = this.vrProbe;
+          }
+          
+          if (!activeProbe) return;
+
+          // 2. Ambil koordinat posisi absolut (World Position) di dalam ruang 3D
+          let probePos = new THREE.Vector3();
+          let apicalPos = new THREE.Vector3();
+          let subcostalPos = new THREE.Vector3();
+
+          activeProbe.object3D.getWorldPosition(probePos);
+          this.targetApical.object3D.getWorldPosition(apicalPos);
+          this.targetSubcostal.object3D.getWorldPosition(subcostalPos);
+
+          // 3. Hitung jarak Euclidean antara alat probe dengan masing-masing titik anatomi
+          let distToApical = probePos.distanceTo(apicalPos);
+          let distToSubcostal = probePos.distanceTo(subcostalPos);
+
+          // 4. Logika Pemicu berdasarkan Probe Terdekat
+          if (distToApical < this.activationDistance) {
+            if (this.activeWindow !== 'apical') {
+              this.triggerWindow('apical');
+            }
+          } else if (distToSubcostal < this.activationDistance) {
+            if (this.activeWindow !== 'subcostal') {
+              this.triggerWindow('subcostal');
+            }
+          } else {
+            if (this.activeWindow !== null) {
+              this.resetWindow();
+            }
+          }
+        },
+
+        triggerWindow: function(type) {
+          this.activeWindow = type;
+          
+          if (type === 'apical') {
+            this.targetApical.setAttribute('color', '#3bf73b');
+            this.targetApical.setAttribute('opacity', '0.9');
+            
+            this.heartHologram.setAttribute('animation', "property: scale; to: 1.8 1.8 1.8; dur: 400; easing: easeOutQuad");
+            this.heartHologram.setAttribute('animation__rot', "property: rotation; to: 20 60 -10; dur: 400; easing: easeOutQuad");
+            
+            this.uiText.setAttribute('value', 'ORIENTASI APICAL WINDOW:\nPutar probe 15 derajat ke arah bahu kanan pasien');
+            this.guidanceArrow.setAttribute('rotation', '0 0 -45');
+            this.guidanceArrow.setAttribute('visible', 'true');
+          } 
+          else if (type === 'subcostal') {
+            this.targetSubcostal.setAttribute('color', '#3bf73b');
+            this.targetSubcostal.setAttribute('opacity', '0.9');
+            
+            this.heartHologram.setAttribute('animation', "property: scale; to: 1.4 1.4 1.4; dur: 400; easing: easeOutQuad");
+            this.heartHologram.setAttribute('animation__rot', "property: rotation; to: 85 0 10; dur: 400; easing: easeOutQuad");
+            
+            this.uiText.setAttribute('value', 'ORIENTASI SUBCOSTAL WINDOW:\nPosisi probe datar di bawah tulang rusuk, arahkan ke hulu hati');
+            this.guidanceArrow.setAttribute('rotation', '45 0 0');
+            this.guidanceArrow.setAttribute('visible', 'true');
+          }
+        },
+
+        resetWindow: function() {
+          // Kembalikan warna indikator lingkaran
+          this.targetApical.setAttribute('color', '#00ff00');
+          this.targetApical.setAttribute('opacity', '0.4');
+          this.targetSubcostal.setAttribute('color', '#00ff00');
+          this.targetSubcostal.setAttribute('opacity', '0.4');
+          
+          // Reset model hologram jantung ke kondisi normal
+          this.heartHologram.setAttribute('animation', "property: scale; to: 1.2 1.2 1.2; dur: 400; easing: easeOutQuad");
+          this.heartHologram.setAttribute('animation__rot', "property: rotation; to: 0 0 0; dur: 400; easing: easeOutQuad");
+          
+          // Reset UI
+          this.uiText.setAttribute('value', 'TRAINING SCANNING:\nDekatkan ujung probe fisik ke area hijau di tubuh pasien');
+          this.guidanceArrow.setAttribute('visible', 'false');
+          
+          this.activeWindow = null;
+        }
+      });
+    </script>
+  </head>
+  <body>
+
+    <a-scene xr-mode-ui="enabled: true" probe-proximity-detector>
+      
+      <a-assets>
+        <a-asset-item id="room-model" src="assets/operating-room-equipment-model.glb"></a-asset-item>
+        <a-asset-item id="patient-model" src="assets/patient.glb"></a-asset-item>
+        <a-asset-item id="cardiac-model" src="assets/cardiac-interactive.glb"></a-asset-item>
+        <a-asset-item id="probe-model" src="assets/sonoque-c3-ultrasound-probe.glb"></a-asset-item>
+      </a-assets>
+
+      <a-light type="ambient" color="#ffffff" intensity="1.4"></a-light>
+      <a-light type="directional" color="#ffffff" intensity="1.0" position="-2 6 4"></a-light>
+      <a-light type="point" color="#ffffff" intensity="0.6" position="0 3.5 -1"></a-light>
+
+      <a-entity gltf-model="#room-model" position="0 0 0" scale="1 1 1"></a-entity>
+
+      <a-entity id="patient-environment" position="-0.3 1.0 -0.8">
+        <a-entity gltf-model="#patient-model" rotation="0 90 0" scale="0.01 0.01 0.01"></a-entity>
+        
+        <a-circle id="target-apical" 
+                  color="#00ff00" 
+                  radius="0.04" 
+                  rotation="-90 0 0" 
+                  position="-0.23 0.25 -0.05" 
+                  opacity="0.4">
+          <a-text value="Apical" align="center" position="0 0 0.01" scale="0.1 0.1 0.1" color="#ffffff"></a-text>
+        </a-circle>
+
+        <a-circle id="target-subcostal" 
+                  color="#00ff00" 
+                  radius="0.04" 
+                  rotation="-90 0 0" 
+                  position="-0.17 0.25 0.0" 
+                  opacity="0.4">
+          <a-text value="Subcostal" align="center" position="0 0 0.01" scale="0.1 0.1 0.1" color="#ffffff"></a-text>
+        </a-circle>
+      </a-entity>
+
+      <a-entity id="heart-hologram" 
+                gltf-model="#cardiac-model" 
+                position="-0.5 1.5 -0.8" 
+                scale="1.2 1.2 1.2"> 
+      </a-entity>
+
+      <a-entity id="ui-panel-group" position="-0.35 1.85 -1.0">
+        <a-text id="ui-instruction-text" 
+                value="TRAINING SCANNING:\nDekatkan ujung probe fisik ke area hijau di tubuh pasien" 
+                align="center" 
+                color="#ffffff" 
+                scale="0.3 0.3 0.3"
+                geometry="primitive: plane; width: 1.8; height: 0.4" 
+                material="color: #023e8a; opacity: 0.85">
+        </a-text>
+        
+        <a-entity id="guidance-arrow" position="0 -0.22 0.1" visible="false">
+          <a-cone color="#00ffcc" radius-bottom="0.03" radius-top="0" height="0.12" position="0 0.08 0" rotation="90 0 0"></a-cone>
+          <a-cylinder color="#00ffcc" radius="0.01" height="0.1" position="0 0 0" rotation="90 0 0"></a-cylinder>
+        </a-entity>
+      </a-entity>
+
+      <a-entity id="rig" position="0 0 0">
+        
+        <a-camera look-controls 
+            wasd-controls="acceleration: 15; fly: false;" 
+            position="0 1.6 0" 
+            camera="near: 0.001; far: 1000;">
+          <a-entity id="desktop-probe" 
+              gltf-model="#probe-model" 
+              position="0 -0.3 -0.5" 
+              rotation="45 340 -20" 
+              scale="0.0008 0.0008 0.0008">
+          </a-entity>
+        </a-camera>
+
+        <a-entity id="right-hand" laser-controls="hand: right">
+          <a-entity id="vr-probe-model"
+                    gltf-model="#probe-model" 
+                    rotation="90 180 0" 
+                    position="0 -10 -0.1" 
+                    scale="0.02 0.02 0.02">
+          </a-entity>
+        </a-entity>
+        
+      </a-entity>
+
+    </a-scene>
+
+  </body>
+</html>
